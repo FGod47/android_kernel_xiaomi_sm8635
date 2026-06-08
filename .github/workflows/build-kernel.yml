@@ -1,0 +1,69 @@
+name: Build Custom Kernel (SM8635)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout Kernel Source
+      uses: actions/checkout@v4
+      with:
+        path: kernel
+
+    - name: Setup Build Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libncurses5 libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev libc6-dev-i386 x11proto-core-dev libx11-dev libgl1-mesa-dev unzip fontconfig python3
+
+    - name: Clone Proton Clang
+      run: git clone https://github.com/kdrag0n/proton-clang.git --depth=1 proton-clang
+
+    - name: Clone AnyKernel3
+      run: git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 AnyKernel3
+
+    - name: Compile Kernel
+      run: |
+        export CLANG_DIR="${GITHUB_WORKSPACE}/proton-clang"
+        export PATH="${CLANG_DIR}/bin:${PATH}"
+        export ARCH=arm64
+        export SUBARCH=arm64
+        export KBUILD_BUILD_HOST="GitHub-Actions"
+        export KBUILD_BUILD_USER="FGod47"
+
+        cd kernel
+        echo ">>> Generating config..."
+        make O=out \
+            CC=clang \
+            HOSTCC=clang \
+            HOSTCXX=clang++ \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            vendor/chenfeng_GKI.config
+
+        echo ">>> Compiling Kernel..."
+        make -j$(nproc) O=out \
+            CC=clang \
+            HOSTCC=clang \
+            HOSTCXX=clang++ \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            LLVM=1 \
+            LLVM_IAS=1
+
+    - name: Package Kernel
+      run: |
+        cp kernel/out/arch/arm64/boot/Image AnyKernel3/
+        cd AnyKernel3
+        sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
+        sed -i 's/block=\/dev\/block\/bootdevice\/by-name\/boot;/block=auto;/g' anykernel.sh
+        zip -r9 ../CustomKernel-chenfeng.zip * -x .git README.md *placeholder
+
+    - name: Upload Kernel Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CustomKernel-chenfeng
+        path: CustomKernel-chenfeng.zip
