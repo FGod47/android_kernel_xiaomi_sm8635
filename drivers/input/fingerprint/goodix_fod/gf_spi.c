@@ -34,6 +34,7 @@
 #include <linux/irq.h>
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/of_gpio.h>
 #include <linux/timer.h>
 #include <linux/notifier.h>
